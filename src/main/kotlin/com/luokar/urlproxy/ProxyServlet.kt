@@ -28,9 +28,9 @@ class ProxyServlet(val client: OkHttpClient) : HttpServlet() {
 
         val okhttpRequest = createOkHttpRequest(cachedRequest)
         val remoteResponse = client.newCall(okhttpRequest).execute()
-        val cachedResponse = CachedResponse(remoteResponse)
-        writeToHttpServletResponse(cachedResponse, resp)
-        println("Response:${cachedResponse}")
+        val response = CachedResponse(remoteResponse)
+        writeToHttpServletResponse(response, resp)
+        println("Response:${response}")
     }
 
     override fun destroy() {

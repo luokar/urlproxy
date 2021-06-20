@@ -9,12 +9,23 @@ import java.nio.charset.Charset
 import java.util.zip.GZIPInputStream
 import java.util.zip.InflaterInputStream
 
-object ContentUtils {
+object ResponseUtils {
 
     fun decode(inputStream: InputStream, encoding: String? = null, charset: Charset? = null): String {
         val decompressedInputStream = uncompress(inputStream, encoding)
         val bomInputStream = BOMInputStream(BufferedInputStream(decompressedInputStream))
         return IOUtils.toString(bomInputStream, charset ?: Charsets.UTF_8)
+    }
+
+    fun getAllResponses(response: CachedResponse): List<CachedResponse> {
+        val responses = ArrayList<CachedResponse>()
+        responses.add(response)
+        var ptr = response
+        while (ptr.priorResponse != null) {
+            responses.add(ptr.priorResponse!!)
+            ptr = ptr.priorResponse!!
+        }
+        return responses
     }
 
     private fun uncompress(inputStream: InputStream, encoding: String?): InputStream {

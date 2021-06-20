@@ -5,6 +5,7 @@ import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpHeaders.CONTENT_ENCODING
 
 class CachedResponse(private val response: Response) {
+
     val headers: HttpHeaders
         get() {
             val httpHeaders = HttpHeaders()
@@ -26,20 +27,22 @@ class CachedResponse(private val response: Response) {
     val contentAsString: String
         get() {
             val charset = response.body?.contentType()?.charset(Charsets.UTF_8) ?: Charsets.UTF_8
-            return ContentUtils.decode(
+            return ResponseUtils.decode(
                 inputStream = contentAsByteArray.inputStream(),
                 encoding = headers.get(CONTENT_ENCODING)?.firstOrNull(),
                 charset = charset
             )
         }
 
-    init {
-        response.body?.close()
-    }
-
     val code: Int get() = response.code
 
+    val priorResponse get() = if (response.priorResponse != null) CachedResponse(response.priorResponse!!) else null
+
     override fun toString(): String {
-        return "CachedResponse(status=${code},headers=${headers},body=${contentAsString})"
+        return if (this.hasBody) {
+            "Response(status=${code},headers=${headers},body=${contentAsString})"
+        } else {
+            "Response(status=${code},headers=${headers})"
+        }
     }
 }

@@ -36,7 +36,7 @@ data class CachedRequest(private val request: HttpServletRequest) :
 
     val contentAsString: String
         get() {
-            return ContentUtils.decode(
+            return ResponseUtils.decode(
                 inputStream = contentAsByteArray.inputStream(),
                 encoding = request.getHeader(HttpHeaders.CONTENT_ENCODING),
                 charset = request.characterEncoding?.let { Charset.forName(it) }

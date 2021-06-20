@@ -44,6 +44,6 @@ data class CachedRequest(private val request: HttpServletRequest) :
         }
 
     override fun toString(): String {
-        return "CachedRequest(method=${request.method},path=${remotePath},query=${request.queryString},headers=${headers},body=${contentAsString})"
+        return "CachedRequest(method=${request.method},path='${remotePath}',query=${request.queryString},headers=${headers},body=${contentAsString})"
     }
 }

@@ -22,7 +22,7 @@ class CachedResponse(private val response: Response) {
         }
 
     val hasBody = response.body?.source()?.exhausted() == false
-    val contentAsByteArray = response.peekBody(Long.MAX_VALUE).bytes()
+    val contentAsByteArray = response.body?.source()?.readByteArray() ?: ByteArray(0)
     val contentAsString: String
         get() {
             val charset = response.body?.contentType()?.charset(Charsets.UTF_8) ?: Charsets.UTF_8

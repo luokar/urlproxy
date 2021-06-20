@@ -5,10 +5,6 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
-import okhttp3.internal.headersContentLength
-import org.apache.commons.io.IOUtils
-import org.springframework.http.HttpHeaders.ACCEPT_ENCODING
-import org.springframework.http.HttpHeaders.HOST
 import java.io.IOException
 import javax.servlet.ServletException
 import javax.servlet.annotation.WebServlet
@@ -18,13 +14,7 @@ import javax.servlet.http.HttpServletResponse
 
 
 @WebServlet("/http:/*", "/https:/*")
-class ProxyServlet() : HttpServlet() {
-
-    companion object {
-        val M = 1024L * 1024 * 1024
-    }
-
-
+class ProxyServlet(val client: OkHttpClient) : HttpServlet() {
     @Throws(ServletException::class)
     override fun init() {
 
@@ -33,62 +23,30 @@ class ProxyServlet() : HttpServlet() {
     @Throws(ServletException::class, IOException::class)
     public override fun service(req: HttpServletRequest, resp: HttpServletResponse) {
 
-        val remoteRequest = createRequest(req)
-        val client = OkHttpClient
-            .Builder()
-            .hostnameVerifier { _, _ -> true }
-            .build()
-        println("Request Header:$remoteRequest")
+        val cachedRequest = CachedRequest(req)
+        println("Request:$cachedRequest")
 
-        val remoteResponse = client.newCall(remoteRequest).execute()
-        println("Response Header:${remoteResponse} ${remoteResponse.headers}")
-        resp.status = remoteResponse.code
-        remoteResponse.headers.forEach { (k, v) ->
-            resp.setHeader(k, v)
-        }
-
-        if (remoteResponse.body != null) {
-            val bs = remoteResponse.body!!.byteStream()
-            val out = resp.outputStream
-            if (remoteResponse.headersContentLength() < 1 * M) {
-                val body = IOUtils.toByteArray(bs)
-                val charset = remoteResponse.body!!.contentType()?.charset()
-                remoteResponse.body
-                val bodyAsString = if (charset != null) {
-                    String(body, charset)
-                } else {
-                    String(body)
-                }
-                println("Response body:${bodyAsString}")
-                IOUtils.write(body, out)
-            } else {
-                println("Response body is too big")
-                bs.copyTo(out)
-            }
-        }
+        val okhttpRequest = createOkHttpRequest(cachedRequest)
+        val remoteResponse = client.newCall(okhttpRequest).execute()
+        val cachedResponse = CachedResponse(remoteResponse)
+        writeToHttpServletResponse(cachedResponse, resp)
+        println("Response:${cachedResponse}")
     }
 
     override fun destroy() {
         // do nothing.
     }
 
-    fun createRequest(request: HttpServletRequest): Request {
+    private fun createOkHttpRequest(request: CachedRequest): Request {
         val headerBuilder = Headers.Builder()
-        request.headerNames.toList().forEach { header ->
-            if (header.equals(HOST, ignoreCase = true) || header.equals(ACCEPT_ENCODING, ignoreCase = true)) {
-                return@forEach
-            }
-            request.getHeaders(header).toList().forEach { value ->
-                headerBuilder.add(header, value)
+        request.modifiedHeaders.forEach { (key, values) ->
+            for (value in values) {
+                headerBuilder.add(key, value)
             }
         }
-        headerBuilder.add(ACCEPT_ENCODING, "identity")
 
-        val requestBody = if (request.contentLength != -1) {
-            val originalBody = ByteArray(request.contentLength)
-            IOUtils.read(request.inputStream, originalBody)
-            println("Request Body: ${String(originalBody)}")
-            originalBody.toRequestBody(request.contentType?.toMediaType())
+        val requestBody = if (request.hasBody) {
+            request.contentAsByteArray.toRequestBody(request.contentType?.toMediaType())
         } else {
             null
         }
@@ -99,11 +57,24 @@ class ProxyServlet() : HttpServlet() {
         } else {
             ""
         }
-        val remoteRequestUri = request.requestURI.substring(1)
+        val remoteRequestUri = request.remotePath
         return Request.Builder()
             .method(method, requestBody)
             .headers(headerBuilder.build())
             .url("$remoteRequestUri$queryString")
             .build()
+    }
+
+    private fun writeToHttpServletResponse(cachedResponse: CachedResponse, resp: HttpServletResponse) {
+        resp.status = cachedResponse.code
+        cachedResponse.modifiedHeaders.forEach { (key, values) ->
+            values.forEach { value ->
+                resp.setHeader(key, value)
+            }
+        }
+        if (cachedResponse.hasBody) {
+            val out = resp.outputStream
+            out.write(cachedResponse.contentAsByteArray)
+        }
     }
 }

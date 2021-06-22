@@ -40,7 +40,7 @@ class CachedResponse(private val response: Response) {
 
     override fun toString(): String {
         return if (this.hasBody) {
-            "Response(status=${code},headers=${headers},body=${contentAsString})"
+            "Response(status=${code},headers=${headers},body='${contentAsString}')"
         } else {
             "Response(status=${code},headers=${headers})"
         }

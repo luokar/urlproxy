@@ -31,6 +31,7 @@ data class CachedRequest(private val request: HttpServletRequest) :
         get() {
             val httpHeaders = headers
             httpHeaders.remove(HttpHeaders.HOST)
+            httpHeaders.remove(HttpHeaders.EXPECT)
             return httpHeaders
         }
 
